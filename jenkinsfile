@@ -1,0 +1,270 @@
+pipeline{
+    agent any
+
+    stages{
+        stage('Gitpull'){
+            steps {
+                //git branch: 'develop', credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/frontend/defi-fe'
+                 checkout([$class: 'GitSCM', branches: [[name: 'develop']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/frontend/defi-fe.git']]])
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage('Build'){
+            steps {
+                sh 'node -v'
+                sh 'yarn -v'
+                sh 'npm install'
+                //sh 'cp /root/source_code/defi-fe/.env ./.env'
+                sh 'npm install'
+                sh 'npm run build'
+                sh 'ls -lat '
+                sh 'ls -lat ./dist/'
+            }    
+
+        }
+
+    }
+        
+    post {
+        always {
+            echo 'One way or another, I have finished'
+            deleteDir() /* clean up our workspace */
+        }
+        success {
+            echo 'I succeeeded!'
+        }
+        unstable {
+            echo 'I am unstable :/'
+        }
+        failure {
+            echo 'I failed :('
+        }
+        changed {
+            echo 'Things were different before...'
+        }
+    }
+ 
+}
+
+---
+docker run \
+--name jenkins --rm \
+-u root -p 8080:8080 -p 50000:50000 \
+-v $(which docker):/usr/bin/docker\
+-v $HOME/.jenkins/:/var/jenkins_home 
+-v /var/run/docker.sock:/var/run/docker.sock \
+jenkins/jenkins:latest
+
+
+pipeline{
+    agent any
+    tools { 
+        maven 'kilo-maven' 
+        jdk 'kilo-jdk' 
+    }
+    stages{
+        stage('Gitpull'){
+            steps {
+             checkout([$class: 'GitSCM', branches: [[name: 'develop']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/backend/defi-api-gateway-service.git']]])   
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage ('Compile Stage') {
+
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn clean compile'
+                }
+            }
+        }    
+        stage ('Testing Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn test'
+                }
+            }
+
+        }
+        stage ('Install  Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn install'
+                }
+            }
+
+        }
+
+        stage ('Install  Build') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn --batch-mode -U -Dmaven.test.skip=true -Djava.net.preferIPv4Stack=true -Ddebug=false clean package spring-boot:repackage'
+                    sh 'mkdir build'
+                    sh 'cp target/api-gateway-service-*.jar build/'
+                }
+            }
+
+        }
+    }
+ 
+}
+
+
+
+
+
+
+
+
+
+
+================
+
+
+
+pipeline {
+    agent any
+    stages{
+        stage('Gitpull'){
+            steps {
+                
+                 checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: '1234', url: 'https://git.lumi.vn/monkeyd.daish/lumi-life-desktop-app.git']]])
+            }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+            }
+        stage('Build'){
+            steps {
+                sh 'node -v'
+                sh 'yarn -v'
+                sh 'npm install'
+                sh 'npm install'
+                sh 'npm run build'
+                sh 'ls -lat '
+                sh 'ls -lat ./dist/'
+            }    
+
+        }
+
+    }
+ 
+    }
+}
+
+
+
+
+stage('Deploy') {
+  steps {
+    script {
+      withCredentials([sshUserPrivateKey(
+        credentialsId: 'ssh',
+        keyFileVariable: 'identityFile',
+        passphraseVariable: '',
+        usernameVariable: 'user'
+      )]) {
+        def remote = [:]
+        remote.name = 'server'
+        remote.host = FRONTEND_SERVER
+        remote.user = user
+        remote.identityFile = identityFile
+        remote.allowAnyHosts = true
+sshCommand remote: remote, command: "cd $FRONTEND_SERVER_DIR && export FRONTEND_IMAGE=$FRONTEND_IMAGE:$BUILD_ID && docker-compose up -d"
+      }
+    }
+  }
+}
+
+pipeline {
+
+  agent {
+    docker {
+      image 'node:12-alpine'
+    }
+  }
+
+  stages {
+ 
+    stage('Test SSH inside a Docker container') {
+     
+      steps {
+        sh "npm --version"
+
+        sshagent (credentials: ['myuser-myserver-ssh-access']) {
+          sh "ssh -vvv -o StrictHostKeyChecking=no -T myuser@myserver"
+        }
+      }
+    }
+  }
+}
+
+
+
+
+
+
+pipeline{
+    agent any
+    stages{
+        stage('Gitpull'){
+            steps {
+                //git branch: 'develop', credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/frontend/defi-fe'
+                 checkout([$class: 'GitSCM', branches: [[name: 'develop']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/frontend/defi-fe.git']]])
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage('Build'){
+            steps {
+                sh 'node -v'
+                sh 'yarn -v'
+                sh 'npm install'
+                //sh 'cp /root/source_code/defi-fe/.env ./.env'
+                sh 'npm install'
+                sh 'npm run build'
+                sh 'ls -lat '
+                sh 'ls -lat ./dist/'
+            }
+        }    
+        stage('Deployment '){
+            steps {
+               sshagent(credentials: ['Deploy-prod-key'], ignoreMissing: true) {
+                     sh 'scp -rp ./dist/ root@52.77.82.94:/opt/dist '
+                } 
+            }
+        }
+
+    }
+}
+
+
+docker run \
+  --name jenkins \
+  -u root \
+  -d \
+  -p 8080:8080 \
+  -p 50000:50000 \
+  -e TZ="Asia/Shanghai" \
+  -v /home/data/www/jenkins.wzlinux.com:/var/jenkins_home \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --restart=on-failure:10 \
+  jenkinsci/blueocean

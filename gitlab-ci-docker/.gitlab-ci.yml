@@ -1,0 +1,153 @@
+image: docker:19
+
+services:
+  - docker:19-dind
+
+# global cache (apply for all jobs in all stages)
+cache:
+  key: ${CI_COMMIT_REF_SLUG} # only apply for current branch
+  paths:
+  - node_modules/
+
+stages:
+  - install
+  - linting
+  - test
+  - build
+  - release
+
+# --- SHARE JOB CONFIGS---
+.linting:
+  stage: linting
+  image: node:14-alpine
+
+# This job relates to production code
+.production_job:
+  only:
+    changes:
+      - Dockerfile
+      - src/**/*
+      - test/**/*
+      - package.json
+      - package-lock.json
+      - .gitlab-ci.yml
+      - ecosystem.config.js
+
+.tests:
+  stage: test
+  image: node:14-alpine
+  extends:
+    - .production_job
+
+.docker_job:
+  before_script:
+    - docker version
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+# --- END SHARE JOB CONFIGS ---
+
+# install npm dependencies so it'll be cache in subsequent jobs
+# note: we can't do this in linting stage as in that stage, 2 jobs run concurrently and both need node_modules
+install_dependencies:
+  stage: install
+  image: node:14-alpine
+  script:
+    - npm install ci
+
+# this job make sure code is linted
+lint-code:
+  extends:
+    - .linting
+    - .production_job # only lint code when production code changes
+  script:
+    - npm run lint
+
+unit-test:
+  extends: .tests
+  script:
+    - npm run test
+
+e2e-test:
+  extends: .tests
+  script:
+    - npm run test:e2e
+
+# this job is to build Docker image and push to registry
+build-docker:
+  stage: build
+  extends:
+    - .docker_job
+    - .production_job
+  script:
+    # fetches the latest image (not failing if image is not found, CI_COMMIT_REF_NAME = current branch)
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME || true
+    # notice the cache-from, which is going to use the image we just pulled locally
+    # the built image is tagged locally with the commit SHA, and then pushed to 
+    # the GitLab registry
+    - >
+      docker build
+      --pull
+      --cache-from $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
+      --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+      .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+build-node-14:
+  stage: build
+  extends:
+  - .production_job
+  image: node:14-alpine
+  script:
+    - npm run build
+
+# Here, the goal is to tag the "master" branch as "latest"
+# This job releases docker image with name like: image_name:latest
+release-latest:
+  variables:
+    # We are just playing with Docker here. 
+    # We do not need GitLab to clone the source code.
+    GIT_STRATEGY: none
+  extends:
+    - .docker_job
+  stage: release
+  only:
+    refs:
+      - master
+    changes: # here we can't extend from production_job because it'll conflict and be override because of 2 "only"
+      - Dockerfile
+      - src/**/*
+      - test/**/*
+      - package.json
+      - package-lock.json
+      - .gitlab-ci.yml
+      - ecosystem.config.js
+  script:
+    # Because we have no guarantee that this job will be picked up by the same runner 
+    # that built the image in the previous step, we pull it again locally
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    # Then we tag it "latest"
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+    # Then we push it.
+    - docker push $CI_REGISTRY_IMAGE:latest
+    # push one more clone of this image under "master"
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:master
+    - docker push $CI_REGISTRY_IMAGE:master
+
+# This job releases docker image with name like: image_name:dev
+release-tag:
+  variables:
+    # We are just playing with Docker here. 
+    # We do not need GitLab to clone the source code.
+    GIT_STRATEGY: none
+  extends:
+    - .docker_job
+    - .production_job
+  stage: release
+  except:
+    # We want this job to be run on other branches except master.
+    - master
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+    # CI_COMMIT_REF_NAME is branch name. Eg: dev, staging,...
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME

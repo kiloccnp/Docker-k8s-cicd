@@ -1,0 +1,60 @@
+#### Deployment 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx 
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-kilo
+        image: nginx
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "50m"
+        ports:
+        - containerPort: 80
+
+
+
+#### service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+  - port: 30080
+    targetPort: 80
+
+### ingress
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: myingress
+  labels:
+      name: myingress
+spec:
+  rules:
+  - host: <Host>
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            serviceName: <Service>
+            servicePort: <Port>
