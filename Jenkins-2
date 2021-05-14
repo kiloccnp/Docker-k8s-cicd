@@ -1,0 +1,64 @@
+pipeline{
+    agent any
+    
+    stages{
+        stage('Gitpull'){
+            steps {
+                //git branch: 'develop', credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/frontend/defi-fe'
+                 checkout([$class: 'GitSCM', branches: [[name: 'master']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/frontend/defi-landing-page.git']]])
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage('Build'){
+            steps {
+                sh 'node -v'
+                sh 'yarn -v'
+                //sh 'yarn install'
+                //sh 'yarn build'
+                sh 'yarn generate'
+                sh 'ls -lat '
+                sh 'rm -rf dist.tar.gz'
+                sh 'ls -lat ./dist/'
+                sh 'tar -cvzf  "dist.tar.gz" dist'
+            
+            }
+        }    
+        stage('Deployment Nginx-01'){
+            steps {
+               sshagent(credentials: ['Deploy-prod-key'], ignoreMissing: true) {
+
+                    sh 'scp -rp -o StrictHostKeyChecking=no dist.tar.gz root@52.77.82.94:/mnt/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@52.77.82.94 tar -xzvf /mnt/dist.tar.gz -C /mnt/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@52.77.82.94 mv /var/www/html/frontend/dist /var/www/html/frontend/dist.$(date +%d-%m-%Y) '
+                    sh 'ssh -o StrictHostKeyChecking=no root@52.77.82.94 mv /mnt/dist /var/www/html/frontend/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@52.77.82.94 chown -R root:root /var/www/html/frontend/*'
+                    
+                } 
+            
+            }
+        }
+
+        stage('Deployment Nginx-02'){
+            steps {
+               sshagent(credentials: ['Deploy-prod-key'], ignoreMissing: true) {
+
+                    sh 'scp -rp -o StrictHostKeyChecking=no dist.tar.gz root@18.139.32.51:/mnt/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@18.139.32.51 tar -xzvf /mnt/dist.tar.gz -C /mnt/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@18.139.32.51 mv /var/www/html/frontend/dist /var/www/html/frontend/dist.$(date +%d-%m-%Y) '
+                    sh 'ssh -o StrictHostKeyChecking=no root@18.139.32.51 mv /mnt/dist /var/www/html/frontend/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@18.139.32.51 chown -R root:root /var/www/html/frontend/*'
+                    
+
+                } 
+            
+            }
+        }
+
+
+    }
+}

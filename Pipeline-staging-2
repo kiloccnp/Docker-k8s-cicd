@@ -1,0 +1,229 @@
+
+pipeline{
+    agent any
+    tools { 
+        maven 'kilo-maven' 
+        jdk 'kilo-jdk' 
+    }
+    stages{
+        stage('Gitpull'){
+            steps {
+             checkout([$class: 'GitSCM', branches: [[name: 'master']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/backend/defi-api-gateway-service.git']]])   
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage ('Compile Stage') {
+
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn clean compile'
+                }
+            }
+        }    
+        stage ('Testing Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn test'
+                }
+            }
+
+        }
+        stage ('Install  Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn install'
+                }
+            }
+
+        }
+
+        stage ('Install  Build') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn --batch-mode -U -Dmaven.test.skip=true -Djava.net.preferIPv4Stack=true -Ddebug=false clean package spring-boot:repackage'
+                    sh 'rm -rf build'
+                    sh 'mkdir build'
+                    sh 'cp target/api-gateway-service-*.jar build/'
+                    sh 'mv build/api-gateway-service-*.jar build/api-gateway-service.jar'
+                }
+            }
+
+        }
+        
+        stage ('Deployment') {        
+            
+            steps {
+                   script {
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo pm2 status api-gateway-service'                  
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo mv /opt/defi-backend/api-gateway-service/api-gateway-service.jar /opt/defi-backend/api-gateway-service/api-gateway-service.jar.jar_$(date +%d-%m-%Y-%H-%M)'
+                    sh 'scp -rp -o StrictHostKeyChecking=no build/api-gateway-service.jar root@3.0.102.47:/opt/defi-backend/api-gateway-service/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo pm2 restart api-gateway-service'
+                   }
+            }
+        }
+        
+    }
+ 
+}
+
+=======================
+
+
+pipeline{
+    agent any
+    tools { 
+        maven 'kilo-maven' 
+        jdk 'kilo-jdk' 
+    }
+    stages{
+        stage('Gitpull'){
+            steps {
+             checkout([$class: 'GitSCM', branches: [[name: 'master']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/backend/defi-authen-service.git']]])   
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage ('Compile Stage') {
+
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn clean compile'
+                }
+            }
+        }    
+        stage ('Testing Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn test'
+                }
+            }
+
+        }
+        stage ('Install  Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn install'
+                }
+            }
+
+        }
+
+        stage ('Install  Build') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn --batch-mode -U -Dmaven.test.skip=true -Djava.net.preferIPv4Stack=true -Ddebug=false clean package spring-boot:repackage'
+                    sh 'rm -rf build'
+                    sh 'mkdir build'
+                    sh 'cp target/defi-authen-service-*.jar build/'
+                    sh 'mv build/defi-authen-service-*.jar build/defi-authen-service.jar'
+                }
+            }
+
+        }
+        
+        stage ('Deployment') {        
+            
+            steps {
+                   script {
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo pm2 status'                  
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo mv /opt/defi-backend/02-defi-authen-service/defi-authen-service.jar /opt/defi-backend/02-defi-authen-service/defi-authen-service.jar_$(date +%d-%m-%Y-%H-%M)'
+                    sh 'scp -rp -o StrictHostKeyChecking=no build/defi-authen-service.jar root@3.0.102.475:/opt/defi-backend/02-defi-authen-service/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo pm2 restart 02-defi-authen-service'
+            
+                   }
+            }
+
+        }
+        
+    }
+}
+
+===================
+
+pipeline{
+    agent any
+    tools { 
+        maven 'kilo-maven' 
+        jdk 'kilo-jdk' 
+    }
+    stages{
+        stage('Gitpull'){
+            steps {
+             checkout([$class: 'GitSCM', branches: [[name: 'develop']], extensions: [], userRemoteConfigs: [[credentialsId: '86a130ff-364b-402d-b87b-134a489103bb', url: 'https://gitlab.com/edsolabs/edsolabs-defi/microservice/backend/defi-nft-crypto-service.git']]])   
+            }
+        }
+        stage('PWD'){
+            steps {
+                sh 'pwd'
+                sh 'ls -lat'
+                } 
+        }
+        stage ('Compile Stage') {
+
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn clean compile'
+                }
+            }
+        }    
+        stage ('Testing Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn test'
+                }
+            }
+
+        }
+        stage ('Install  Stage') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn install'
+                }
+            }
+
+        }
+
+        stage ('Install  Build') {        
+            
+            steps {
+                withMaven(maven : 'kilo-maven') {
+                    sh 'mvn --batch-mode -U -Dmaven.test.skip=true -Djava.net.preferIPv4Stack=true -Ddebug=false clean package spring-boot:repackage'
+                    sh 'rm -rf build'
+                    sh 'mkdir build'
+                    sh 'cp target/defi-nft-crypto-service-*.jar build/'
+                    sh 'mv build/defi-nft-crypto-service-*.jar build/defi-nft-crypto-service.jar'
+                }
+            }
+        }
+        stage ('Deployment') {        
+            
+            steps {
+                   script {
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo pm2 status'                  
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo mv /opt/defi-backend/06-defi-nft-crypto-service/defi-nft-crypto-service.jar /opt/defi-backend/06-defi-nft-crypto-service/defi-nft-crypto-service.jar_$(date +%d-%m-%Y-%H-%M)'
+                    sh 'scp -rp -o StrictHostKeyChecking=no build/defi-nft-crypto-service.jar root@3.0.102.47:/opt/defi-backend/06-defi-nft-crypto-service/'
+                    sh 'ssh -o StrictHostKeyChecking=no root@3.0.102.47 sudo pm2 restart 06-defi-nft-crypto-service'
+                   }
+            }
+
+        }
+
+    }
+}

@@ -54,3 +54,33 @@ restart)
       echo "$SERVICE_NAME is not running ..."    
      fi     ;;
  esac
+
+
+ #!/bin/sh
+# Maintenace by kilo
+cd /opt/defi-backend/01-defi-service-registry/
+APP_NAME="defi-service-registry"
+PID_NAME=$APP_NAME.pid
+
+
+  if [ ! -f $PID_NAME ]; then 
+            nohup java -Xms128m -Xmx1g -jar  $APP_NAME.jar --spring.config.import=file:.env.properties & echo $! > $PID_NAME
+       echo "$SERVICE_NAME started ..."         
+  else 
+       echo "$SERVICE_NAME is already running ..."
+  fi
+
+
+  ====
+
+cd /opt/defi-backend/06-defi-nft-crypto-service/
+APP_NAME="defi-nft-crypto-service"
+PID_NAME=$APP_NAME.pid
+
+
+  if [ ! -f $PID_NAME ]; then 
+            nohup java -Xms128m -Xmx1g -jar  $APP_NAME.jar --spring.config.import=file:.env.properties & echo $! > $PID_NAME
+       echo "$SERVICE_NAME started ..."         
+  else 
+       echo "$SERVICE_NAME is already running ..."
+  fi

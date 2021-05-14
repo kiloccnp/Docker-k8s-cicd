@@ -1,0 +1,143 @@
+	log_format json_log escape=json '{"connection_serial_number":$connection,'
+									 '"number_of_requests":$connection_requests,'
+									 '"response_status":"$status",'
+									 '"body_bytes_sent":$body_bytes_sent,'
+									 '"content_type":"$content_type",'
+									 '"host":"$host",'
+									 '"host_name":"$hostname",'
+									 '"http_name":"$http_name",'
+									 '"https":"$https",'
+									 '"proxy_protocol_addr":"$proxy_protocol_addr",'
+									 '"proxy_protocol_port":"$proxy_protocol_port",'
+									 '"query_string":"$query_string",'
+									 '"client_address":"$remote_addr",'
+									 '"http_ar_real_proto":"$http_ar_real_proto",'
+									 '"http_ar_real_ip":"$http_ar_real_ip",'
+									 '"http_ar_real_country":"$http_ar_real_country",'
+									 '"http_x_real_ip":"$http_x_real_ip",'
+									 '"http_x_forwarded_for":"$http_x_forwarded_for",'
+									 '"http_config":"$http_config",'
+									 '"client_port":"$remote_port",'
+									 '"remote_user":"$remote_user",'
+									 '"request":"$request",'
+									 '"request_time":$request_time,'
+									 '"request_id":"$request_id",'
+									 '"request_length":$request_length,'
+									 '"request_method":"$request_method",'
+									 '"request_uri":"$request_uri",'
+									 '"request_body":"$request_body",'
+									 '"scheme":"$scheme",'
+									 '"server_addr":"$server_addr",'
+									 '"server_name":"$server_name",'
+									 '"server_port":"$server_port",'
+									 '"server_protocol":"$server_protocol",'
+									 '"http_user_agent":"$http_user_agent",'
+									 '"time_local":"$time_local",'
+									 '"time_iso":"$time_iso8601",'
+									 '"url":"$scheme://$host$request_uri",'
+									 '"uri":"$uri"}';
+                                    
+====
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+#    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+#                      '$status $body_bytes_sent "$http_referer" '
+#                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+access_log syslog:server=fluentd:1514,tag=nginx_access  json_log;    
+error_log syslog:server=fluentd:1514,tag=nginx_error info;
+    sendfile        on;
+    #tcp_nopush     on;
+
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+
+=======
+version: '2'
+services:
+  nginx:
+    image: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/json_log:/etc/nginx/conf.d/json_log
+    ports: 
+      - "8080:80"
+    networks:
+      - elk
+  
+  fluentd:
+    build: fluentd/
+    ports:
+      - 1514:1514/udp
+    volumes:
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
+    networks:
+      - elk
+
+networks:
+
+  elk:
+    driver: bridge
+
+
+====
+FROM fluent/fluentd:v1.3-1
+
+# Use root account to use apk
+USER root
+
+# below RUN includes plugin as examples elasticsearch is not required
+# you may customize including plugins as you wish
+RUN apk add --no-cache --update --virtual .build-deps \
+    build-base ruby-dev \
+    &&      gem install \
+        fluent-plugin-record-modifier\
+         fluent-plugin-elasticsearch \
+    &&      gem sources --clear-all \
+    &&     apk del .build-deps \
+    &&     rm -rf /home/fluent/.gem/ruby/2.5.0/cache/*.gem
+
+USER fluent
+
+====
+
+<source>
+    @type syslog
+    port 1514
+    tag nginx.access
+</source>
+
+<filter **>
+  @type parser
+  key_name message
+  <parse>
+    @type json
+    json_parser yajl
+  </parse>
+</filter>
+
+<match **>
+      @type elasticsearch
+      host elasticsearch
+      port 9200
+      index_name nginx_access
+      flush_interval 1s
+</match>
